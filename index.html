@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
 <title>Car Hunt</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script>window.CAR_SITE = { url: "https://aezxrvipstyzkylghkem.supabase.co", key: "sb_publishable_AY2NZYWUNrvrV5WmUdplYw_ttKoWe67" };</script>
 </head>
 <body>
 
@@ -125,6 +127,11 @@ summary { cursor: pointer; font-family: var(--font-display); font-weight: 600; f
 @media (prefers-reduced-motion: no-preference) { .card { transition: opacity .2s; } }
 .pub .chip[data-f="interested"], .pub .chip[data-f="passed"], .pub .chip[data-f="gone"] { display: none; }
 a.btn.txt { text-decoration: none; color: var(--fg); display: inline-block; }
+.auth { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; display: grid; gap: 6px; font-size: 14px; }
+.auth[hidden] { display: none; }
+.auth-lead { margin: 0 0 6px; }
+.auth-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.auth-row input { flex: 1 1 160px; min-width: 0; font: 400 15px var(--font-body); padding: 7px 9px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); }
 .facts { margin: -4px 0 0; font-size: 13.5px; color: var(--fg); display: flex; flex-wrap: wrap; align-items: center; gap: 2px 0; }
 .facts span + span::before { content: "·"; color: var(--muted); padding: 0 6px; }
 .facts .unk { color: var(--warn); }
@@ -158,6 +165,20 @@ a.btn.txt { text-decoration: none; color: var(--fg); display: inline-block; }
     <p>Safe, reliable first cars from St. George to Preston, Evanston to Wendover, $3,000 to $5,500. Checked every morning and evening; new finds show up here first.</p>
     <div class="runline" id="runline">Waiting for the latest search…</div>
   </header>
+
+  <div class="auth" id="auth" hidden>
+    <form id="auth-form" class="auth-out" autocomplete="on"><div id="auth-out">
+      <p class="auth-lead">Sign in to ♥ and ✕ cars. Everyone in the family sees each other's picks.</p>
+      <div class="auth-row">
+        <input id="auth-email" type="email" autocomplete="username" placeholder="Email" aria-label="Email" required>
+        <input id="auth-pass" type="password" autocomplete="current-password" placeholder="Password" aria-label="Password" required minlength="8">
+        <button class="btn on-int" type="submit">Sign in</button>
+        <button class="btn" type="button" id="auth-new">Create my login</button>
+      </div>
+    </div></form>
+    <div id="auth-in" hidden><span id="auth-who"></span> <button class="freset" type="button" id="auth-out-btn">Sign out</button></div>
+    <p class="fnote" id="authmsg" role="status"></p>
+  </div>
 
   <div class="controls" role="toolbar" aria-label="Filter listings">
     <button class="chip" data-f="active" aria-pressed="true">Active<span class="n" id="n-active">0</span></button>
@@ -562,6 +583,8 @@ a.btn.txt { text-decoration: none; color: var(--fg); display: inline-block; }
   const TAG_HELP = {
     "New": "Just found. Nobody has marked it Interested or Pass yet.",
     "On our list": "Dad marked this one as worth a closer look.",
+    "♥": "Someone in the family liked this one. Tap ♥ Like on a car to add yours.",
+    "✕": "Someone in the family passed on this one. Your own ✕ hides it from your Active list.",
     "Top pick": "Passes every must-have: good safety, good reliability, a fair price, fits the budget, and nothing left to check.",
     "Check first": "Something needs a look before getting excited, like missing miles, an unconfirmed title or an old hybrid battery. The note on the card says what.",
     "Good deal": "Priced below what similar cars sell for.",
@@ -605,8 +628,9 @@ a.btn.txt { text-decoration: none; color: var(--fg); display: inline-block; }
       if (btn.dataset.tags) {
         const dl = el("dl", "tdefs");
         for (const t of btn.dataset.tags.split("|")) {
-          if (!TAG_HELP[t]) continue;
-          dl.appendChild(el("dt", null, t)); dl.appendChild(el("dd", null, TAG_HELP[t]));
+          const key = TAG_HELP[t] ? t : / ♥$/.test(t) ? "♥" : / ✕$/.test(t) ? "✕" : null;
+          if (!key) continue;
+          dl.appendChild(el("dt", null, t)); dl.appendChild(el("dd", null, TAG_HELP[key]));
         }
         pop.appendChild(dl);
       } else for (const t of g.slice(1)) pop.appendChild(el("p", null, t));
@@ -661,6 +685,9 @@ a.btn.txt { text-decoration: none; color: var(--fg); display: inline-block; }
       if (isNew(r) && s === "new") b.appendChild(el("span", "badge b-new", "New"));
       if (isPick(r)) b.appendChild(el("span", "badge b-fill b-good", "Top pick"));
       if (state.pub && s === "interested") b.appendChild(el("span", "badge b-pick", "On our list"));
+      if (state.site) for (const [em, pk] of Object.entries(state.picks[r.id] || {})) {
+        b.appendChild(el("span", "badge " + (pk === "like" ? "b-fill b-good" : "b-flag"), personName(em) + (pk === "like" ? " ♥" : " ✕")));
+      }
       if (r.tier === "flag") b.appendChild(el("span", "badge b-flag", "Check first"));
       if (r.deal && dealLabel[r.deal]) b.appendChild(el("span", "badge b-fill b-" + r.deal, dealLabel[r.deal]));
       if (isAwd(r)) b.appendChild(el("span", "badge b-good", "AWD"));
@@ -754,6 +781,22 @@ a.btn.txt { text-decoration: none; color: var(--fg); display: inline-block; }
       card.appendChild(more);
 
       const a = el("div", "actions");
+      if (state.site) {
+        const mine = myPick(r.id);
+        const bl = el("button", "btn" + (mine === "like" ? " on-int" : ""), mine === "like" ? "♥ Liked" : "♥ Like");
+        const bx = el("button", "btn" + (mine === "pass" ? " on-pass" : ""), mine === "pass" ? "✕ Passed" : "✕ Pass");
+        bl.type = bx.type = "button";
+        if (state.family) {
+          bl.addEventListener("click", () => setPick(r.id, mine === "like" ? null : "like"));
+          bx.addEventListener("click", () => setPick(r.id, mine === "pass" ? null : "pass"));
+        } else {
+          bl.disabled = bx.disabled = true;
+          bl.title = bx.title = "Sign in at the top to pick";
+        }
+        a.appendChild(bl); a.appendChild(bx);
+        if (r.url) { const l = el("a", "open", "Open listing ↗"); l.href = r.url; l.target = "_blank"; l.rel = "noopener"; a.appendChild(l); }
+        card.appendChild(a); list.appendChild(card); continue;
+      }
       if (state.pub) {
         const name = [r.year, r.make, r.model].filter(Boolean).join(" ");
         const o2 = otd(r);
@@ -849,6 +892,7 @@ a.btn.txt { text-decoration: none; color: var(--fg); display: inline-block; }
   render();
 
   (async () => {
+    if (window.CAR_SITE) return void setTimeout(() => loadSite(window.CAR_SITE), 0);
     if (!window.claude || !window.claude.use) return loadPublic();
     db = await window.claude.use("db");
     if (!db) { $("runline").textContent = "Sign in to see the saved list."; return; }
@@ -864,6 +908,100 @@ a.btn.txt { text-decoration: none; color: var(--fg); display: inline-block; }
     }, () => {});
     db.doc("meta/status").onSnapshot((d) => { state.meta = d.exists ? d.data() : null; renderMeta(); }, () => {});
   })();
+
+
+  // ---- Shared family site (hosted outside Claude, backed by Supabase) ----
+  let sb = null;
+  state.picks = {}; state.people = {}; state.me = null; state.family = false;
+  const myPick = (id) => (state.me && state.picks[id] ? state.picks[id][state.me] : null) || null;
+  const personName = (em) => state.people[em] || em.split("@")[0];
+  function applyPicks() {
+    for (const r of state.rows) {
+      const ps = state.picks[r.id] || {};
+      const mine = state.me ? ps[state.me] : null;
+      const anyLike = Object.values(ps).includes("like");
+      r.status = r._st === "gone" ? "gone" : mine === "pass" ? "passed" : anyLike ? "interested" : (r._st === "new" ? "new" : "seen");
+    }
+  }
+  async function loadPicks() {
+    state.picks = {}; state.people = {}; state.family = false;
+    if (state.me) {
+      const [pe, pk] = await Promise.all([sb.from("people").select("email,name"), sb.from("picks").select("car_id,email,pick")]);
+      for (const x of (pe.data || [])) state.people[x.email.toLowerCase()] = x.name;
+      state.family = !!state.people[state.me];
+      for (const x of (pk.data || [])) (state.picks[x.car_id] = state.picks[x.car_id] || {})[x.email.toLowerCase()] = x.pick;
+    }
+    applyPicks(); renderAuth(); syncFilters(); render();
+  }
+  async function loadCars() {
+    const [cs, mt] = await Promise.all([sb.from("cars").select("id,data,status").limit(2000), sb.from("meta").select("data").eq("id", "status").maybeSingle()]);
+    if (cs.error) throw cs.error;
+    state.rows = (cs.data || []).map((x) => Object.assign({}, x.data, { id: x.id, _st: x.status }));
+    state.meta = mt.data ? mt.data.data : null;
+    renderMeta();
+  }
+  async function setPick(id, pick) {
+    if (!state.family) return;
+    const prev = (state.picks[id] || {})[state.me];
+    (state.picks[id] = state.picks[id] || {});
+    if (pick) state.picks[id][state.me] = pick; else delete state.picks[id][state.me];
+    applyPicks(); counts(); render();
+    const res = pick
+      ? await sb.from("picks").upsert({ car_id: id, email: state.me, pick, updated_at: new Date().toISOString() })
+      : await sb.from("picks").delete().eq("car_id", id).eq("email", state.me);
+    if (res.error) {
+      if (prev) state.picks[id][state.me] = prev; else delete state.picks[id][state.me];
+      applyPicks(); render();
+      $("authmsg").textContent = "That didn't save. Check your connection and try again.";
+    }
+  }
+  function renderAuth() {
+    const box = $("auth"); if (!box) return;
+    box.hidden = false;
+    $("auth-out").hidden = !!state.me; $("auth-in").hidden = !state.me;
+    if (state.me) {
+      $("auth-who").textContent = state.family ? "Signed in as " + personName(state.me) : "Signed in as " + state.me + ", but that email isn't on the family list, so picks won't save.";
+    }
+  }
+  function wireAuth() {
+    const msg = (t) => { $("authmsg").textContent = t || ""; };
+    const creds = () => ({ email: $("auth-email").value.trim().toLowerCase(), password: $("auth-pass").value });
+    $("auth-form").addEventListener("submit", async (e) => {
+      e.preventDefault(); msg("Signing in…");
+      const { error } = await sb.auth.signInWithPassword(creds());
+      msg(error ? (/invalid/i.test(error.message) ? "That email and password don't match. First time? Tap Create my login." : error.message) : "");
+    });
+    $("auth-new").addEventListener("click", async () => {
+      const c = creds();
+      if (!c.email || c.password.length < 8) { msg("Enter your email and a password of at least 8 characters, then tap Create my login."); return; }
+      msg("Creating your login…");
+      const { data, error } = await sb.auth.signUp(c);
+      if (error) { msg(/registered/i.test(error.message) ? "You already have a login. Tap Sign in instead." : error.message); return; }
+      msg(data.session ? "" : "Login created. Now tap Sign in.");
+    });
+    $("auth-out-btn").addEventListener("click", async () => { await sb.auth.signOut(); });
+  }
+  async function loadSite(cfg) {
+    state.site = true; state.canWrite = true;
+    document.documentElement.classList.add("site");
+    document.title = "Car Hunt";
+    const h1 = document.querySelector(".sign h1"); if (h1) h1.textContent = "Car Hunt";
+    const lbl = document.querySelector('.chip[data-f="interested"]'); if (lbl && lbl.firstChild) lbl.firstChild.textContent = "Liked";
+    if (!window.supabase) { $("runline").textContent = "Couldn't load. Check your connection and refresh."; return; }
+    sb = window.supabase.createClient(cfg.url, cfg.key, { auth: { persistSession: true, autoRefreshToken: true } });
+    wireAuth();
+    try { await loadCars(); } catch (e) { $("runline").textContent = "Couldn't load the car list. Try again in a minute."; return; }
+    const { data } = await sb.auth.getSession();
+    state.me = data.session ? data.session.user.email.toLowerCase() : null;
+    await loadPicks();
+    sb.auth.onAuthStateChange((_ev, session) => {
+      const me = session ? session.user.email.toLowerCase() : null;
+      if (me !== state.me) { state.me = me; loadPicks(); }
+    });
+    const refresh = async () => { try { await loadCars(); await loadPicks(); } catch (e) {} };
+    document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(); });
+    setInterval(() => { if (!document.hidden) refresh(); }, 60000);
+  }
 
   // Read-only copy (hosted outside Claude): cars come from cars.json, refreshed after each search.
   async function loadPublic() {
