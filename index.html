@@ -1,0 +1,887 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Car Hunt</title>
+</head>
+<body>
+
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Source+Sans+3:wght@400;600&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* Layout: a scan-first list of window-sticker cards under a highway-sign header; filters as chips, one column on phones */
+:root {
+  --bg: #f3f4f1;
+  --surface: #ffffff;
+  --fg: #1b211d;
+  --muted: #5d665f;
+  --line: #d9ddd6;
+  --sign: #1d5e3f;        /* highway-sign green */
+  --sign-fg: #ffffff;
+  --accent: #1d5e3f;
+  --good: #2c7a4b;
+  --warn: #a5650b;
+  --bad: #a83a2f;
+  --chip: #e6e9e3;
+  --font-display: "Barlow Condensed", "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "Source Sans 3", "Segoe UI", Helvetica, Arial, sans-serif;
+  --font-data: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #121613; --surface: #1a201c; --fg: #e7ebe5; --muted: #9aa49c; --line: #2c342e;
+    --sign: #1f6a46; --sign-fg: #f2f6f2; --accent: #6cc797; --good: #6cc797; --warn: #e3a54a; --bad: #ec7f73; --chip: #242b26;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #121613; --surface: #1a201c; --fg: #e7ebe5; --muted: #9aa49c; --line: #2c342e;
+  --sign: #1f6a46; --sign-fg: #f2f6f2; --accent: #6cc797; --good: #6cc797; --warn: #e3a54a; --bad: #ec7f73; --chip: #242b26;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 15px; line-height: 1.45; }
+.wrap { max-width: 980px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 20px 48px; display: grid; gap: 18px; }
+.sign { background: var(--sign); color: var(--sign-fg); border-radius: 10px; padding: 16px 18px; display: grid; gap: 6px; border: 3px solid var(--sign); box-shadow: inset 0 0 0 2px rgba(255,255,255,.55); }
+.sign h1 { font-family: var(--font-display); font-weight: 700; font-size: clamp(30px, 6vw, 44px); line-height: 1; margin: 0; letter-spacing: .01em; text-wrap: balance; }
+.sign p { margin: 0; opacity: .92; max-width: 62ch; }
+.runline { font-family: var(--font-data); font-size: 12.5px; opacity: .9; }
+.controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.chip { font: 600 13px var(--font-body); border: 1px solid var(--line); background: var(--chip); color: var(--fg); border-radius: 999px; padding: 6px 12px; cursor: pointer; }
+.chip[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.chip .n { font-family: var(--font-data); font-weight: 500; margin-left: 4px; opacity: .75; }
+.chip:focus-visible, button:focus-visible, select:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.spacer { flex: 1; }
+select { font: 600 13px var(--font-body); padding: 6px 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); }
+.list { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 12px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 14px 12px; display: grid; gap: 10px; align-content: start; min-width: 0; position: relative; }
+.card.is-new { border-color: var(--accent); }
+.card.is-passed, .card.is-gone { opacity: .55; }
+.top { display: flex; gap: 8px; align-items: baseline; justify-content: space-between; }
+.car { font-family: var(--font-display); font-weight: 700; font-size: 23px; line-height: 1.05; margin: 0; text-wrap: balance; min-width: 0; }
+.trim { font-family: var(--font-body); font-weight: 400; font-size: 14px; color: var(--muted); display: block; margin-top: 2px; }
+.price { font-family: var(--font-data); font-size: 19px; white-space: nowrap; }
+.sticker { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 12px; border-top: 1px dashed var(--line); border-bottom: 1px dashed var(--line); padding-block: 8px; font-size: 13px; }
+.sticker dt { color: var(--muted); text-transform: uppercase; letter-spacing: .06em; font-size: 10.5px; font-weight: 600; }
+.sticker dd { margin: 0 0 4px; font-family: var(--font-data); font-variant-numeric: tabular-nums; font-size: 13px; overflow-wrap: anywhere; }
+.badges { display: flex; flex-wrap: wrap; gap: 6px; }
+.badge { font: 600 11px var(--font-body); letter-spacing: .05em; text-transform: uppercase; border-radius: 4px; padding: 2px 6px; border: 1px solid currentColor; }
+.b-pick { color: var(--good); } .b-flag { color: var(--warn); } .b-new { color: var(--accent); } .b-src { color: var(--muted); }
+.b-good { color: var(--good); } .b-ok { color: var(--warn); } .b-bad { color: var(--bad); }
+.b-fill { border-color: transparent; }
+.b-fill.b-good { background: var(--good); color: var(--surface); }
+.b-fill.b-ok { background: var(--warn); color: var(--surface); }
+.b-fill.b-bad { background: var(--bad); color: var(--surface); }
+.meters { display: grid; gap: 7px; }
+.meter { display: grid; grid-template-columns: 96px 1fr auto; align-items: center; gap: 8px; font-size: 12.5px; }
+.meter .mlabel { color: var(--muted); font-size: 10.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
+.meter .mval { font-weight: 600; white-space: nowrap; font-size: 12.5px; }
+.segs { display: grid; grid-template-columns: repeat(5, 1fr); gap: 3px; height: 9px; }
+.segs i { display: block; border-radius: 2px; background: var(--chip); }
+.segs.lv1 i:nth-child(-n+1), .segs.lv2 i:nth-child(-n+2) { background: var(--bad); }
+.segs.lv3 i:nth-child(-n+3) { background: var(--warn); }
+.segs.lv4 i:nth-child(-n+4), .segs.lv5 i:nth-child(-n+5) { background: var(--good); }
+.budget { position: relative; height: 9px; border-radius: 3px; background: var(--chip); overflow: hidden; }
+.budget .fill { position: absolute; inset: 0 auto 0 0; border-radius: 3px; }
+.budget .band { position: absolute; top: 0; bottom: 0; opacity: .45; }
+.budget.ok .fill, .budget.ok .band { background: var(--good); }
+.budget.tight .fill, .budget.tight .band { background: var(--warn); }
+.budget.over .fill, .budget.over .band { background: var(--bad); }
+.budgetset { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.budgetset input { width: 92px; font: 500 13px var(--font-data); padding: 5px 7px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); }
+.why { margin: 0; font-size: 13px; color: var(--muted); }
+.why b { color: var(--fg); font-weight: 600; }
+.filters { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+.fgroup { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.flabel { font-size: 11px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); min-width: 92px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg button { font: 600 13px var(--font-body); background: transparent; color: var(--fg); border: 0; border-left: 1px solid var(--line); padding: 6px 11px; cursor: pointer; }
+.seg button:first-child { border-left: 0; }
+.seg button[aria-checked="true"] { background: var(--fg); color: var(--bg); }
+.seg button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.freset { font: 600 13px var(--font-body); background: none; border: 0; color: var(--accent); cursor: pointer; padding: 6px 4px; margin-left: auto; }
+.freset[hidden] { display: none; }
+.fnote { width: 100%; margin: 0; font-size: 12px; color: var(--muted); }
+@media (max-width: 520px) { .flabel { min-width: 0; width: 100%; } .freset { margin-left: 0; } }
+.note { margin: 0; font-size: 14px; color: var(--fg); }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.btn { font: 600 13px var(--font-body); border-radius: 8px; padding: 6px 10px; border: 1px solid var(--line); background: transparent; color: var(--fg); cursor: pointer; }
+.btn.on-int { background: var(--good); color: var(--surface); border-color: var(--good); }
+.btn.on-pass { background: var(--bad); color: var(--surface); border-color: var(--bad); }
+.btn:disabled { opacity: .5; cursor: default; }
+a.open { margin-left: auto; color: var(--accent); font-weight: 600; font-size: 13px; text-decoration: none; }
+a.open:hover { text-decoration: underline; }
+.empty { background: var(--surface); border: 1px dashed var(--line); border-radius: 10px; padding: 28px 18px; text-align: center; color: var(--muted); }
+details { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+summary { cursor: pointer; font-family: var(--font-display); font-weight: 600; font-size: 19px; }
+.crit { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin-top: 10px; font-size: 14px; }
+.crit h3 { margin: 0 0 4px; font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); }
+.crit ul { margin: 0; padding-left: 18px; }
+.foot { color: var(--muted); font-size: 12.5px; max-width: 70ch; }
+@media (prefers-reduced-motion: no-preference) { .card { transition: opacity .2s; } }
+.pub .chip[data-f="interested"], .pub .chip[data-f="passed"], .pub .chip[data-f="gone"] { display: none; }
+a.btn.txt { text-decoration: none; color: var(--fg); display: inline-block; }
+.facts { margin: -4px 0 0; font-size: 13.5px; color: var(--fg); display: flex; flex-wrap: wrap; align-items: center; gap: 2px 0; }
+.facts span + span::before { content: "·"; color: var(--muted); padding: 0 6px; }
+.facts .unk { color: var(--warn); }
+.money { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.money > div { background: var(--chip); border-radius: 8px; padding: 7px 10px; min-width: 0; }
+.money .k { display: flex; align-items: center; gap: 4px; color: var(--muted); font-size: 10.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
+.money .v { font-family: var(--font-data); font-variant-numeric: tabular-nums; font-size: 15px; font-weight: 500; white-space: nowrap; }
+.money .s { font-size: 11.5px; color: var(--muted); }
+.mlabel { display: inline-flex; align-items: center; gap: 3px; }
+.card details.more { background: none; border: 0; border-top: 1px dashed var(--line); border-radius: 0; padding: 8px 0 0; }
+.card details.more summary { font: 600 13px var(--font-body); color: var(--accent); }
+.card details.more[open] summary { margin-bottom: 6px; }
+.card details.more .why + .why { margin-top: 5px; }
+.card details.more .sticker { border: 0; padding: 6px 0 0; }
+.info { font: 600 12px/1 var(--font-body); width: 22px; height: 22px; padding: 0; margin: -4px -2px; border: 0; background: none; color: var(--muted); cursor: pointer; border-radius: 50%; display: inline-grid; place-items: center; text-transform: none; letter-spacing: 0; flex: none; }
+.info::before { content: "i"; font-family: Georgia, serif; font-style: italic; font-size: 11px; width: 15px; height: 15px; border: 1.3px solid currentColor; border-radius: 50%; display: grid; place-items: center; }
+.info:hover, .info[aria-expanded="true"] { color: var(--accent); }
+.pop { position: fixed; z-index: 50; max-width: min(320px, calc(100vw - 32px)); background: var(--fg); color: var(--bg); border-radius: 10px; padding: 11px 13px; font-size: 13.5px; line-height: 1.45; box-shadow: 0 6px 24px rgba(0,0,0,.25); }
+.pop[hidden] { display: none; }
+.pop b { display: block; font-family: var(--font-display); font-size: 17px; margin-bottom: 3px; }
+.pop p { margin: 0; } .pop p + p { margin-top: 6px; }
+.pop .tdefs { margin: 4px 0 0; display: grid; gap: 7px; }
+.pop .tdefs dt { font-weight: 700; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; }
+.pop .tdefs dd { margin: 1px 0 0; }
+.flabel { display: inline-flex; align-items: center; gap: 3px; }
+</style>
+
+<div class="wrap">
+  <header class="sign">
+    <h1>Leila's Car Hunt</h1>
+    <p>Safe, reliable first cars from St. George to Preston, Evanston to Wendover, $3,000 to $5,500. Checked every morning and evening; new finds show up here first.</p>
+    <div class="runline" id="runline">Waiting for the latest search…</div>
+  </header>
+
+  <div class="controls" role="toolbar" aria-label="Filter listings">
+    <button class="chip" data-f="active" aria-pressed="true">Active<span class="n" id="n-active">0</span></button>
+    <button class="chip" data-f="new" aria-pressed="false">New<span class="n" id="n-new">0</span></button>
+    <button class="chip" data-f="interested" aria-pressed="false">Interested<span class="n" id="n-interested">0</span></button>
+    <button class="chip" data-f="passed" aria-pressed="false">Passed<span class="n" id="n-passed">0</span></button>
+    <button class="chip" data-f="gone" aria-pressed="false">Sold / gone<span class="n" id="n-gone">0</span></button>
+    <span class="spacer"></span>
+    <label for="sort" class="trim" style="margin:0">Sort</label>
+    <select id="sort">
+      <option value="score">Best overall fit</option>
+      <option value="deal">Best deals first</option>
+      <option value="safety">Safest first</option>
+      <option value="reliability">Most reliable first</option>
+      <option value="upkeep">Lowest upkeep first</option>
+      <option value="newest">Newest found</option>
+      <option value="price">Lowest price</option>
+      <option value="miles">Lowest miles</option>
+    </select>
+  </div>
+
+  <div class="filters" id="filters">
+    <div class="fgroup"><span class="flabel"><span id="lbl-safety">Safety</span><button type="button" class="info" data-g="safety" aria-label="What is safety?"></button></span>
+      <div class="seg" role="radiogroup" aria-labelledby="lbl-safety" data-key="safety">
+        <button type="button" role="radio" data-v="any">Any</button>
+        <button type="button" role="radio" data-v="ok">OK or better</button>
+        <button type="button" role="radio" data-v="good">Good only</button>
+      </div></div>
+    <div class="fgroup"><span class="flabel"><span id="lbl-deal">Deal</span><button type="button" class="info" data-g="deal" aria-label="What is deal?"></button></span>
+      <div class="seg" role="radiogroup" aria-labelledby="lbl-deal" data-key="deal">
+        <button type="button" role="radio" data-v="any">Any</button>
+        <button type="button" role="radio" data-v="ok">OK or better</button>
+        <button type="button" role="radio" data-v="good">Good only</button>
+      </div></div>
+    <div class="fgroup"><span class="flabel"><span id="lbl-trans">Transmission</span><button type="button" class="info" data-g="trans" aria-label="What is transmission?"></button></span>
+      <div class="seg" role="radiogroup" aria-labelledby="lbl-trans" data-key="trans">
+        <button type="button" role="radio" data-v="any">Both</button>
+        <button type="button" role="radio" data-v="auto">Automatic</button>
+        <button type="button" role="radio" data-v="manual">Manual</button>
+      </div></div>
+    <div class="fgroup"><span class="flabel"><span id="lbl-drive">Drive</span><button type="button" class="info" data-g="drive" aria-label="What is drive?"></button></span>
+      <div class="seg" role="radiogroup" aria-labelledby="lbl-drive" data-key="drive">
+        <button type="button" role="radio" data-v="any">Both</button>
+        <button type="button" role="radio" data-v="awd">AWD</button>
+        <button type="button" role="radio" data-v="fwd">FWD</button>
+      </div></div>
+    <div class="fgroup budgetset"><span class="flabel"><label for="budget">Budget</label><button type="button" class="info" data-g="budget" aria-label="What is the budget?"></button></span>
+      <input id="budget" type="number" inputmode="numeric" min="1000" step="100" value="6000" aria-describedby="budgethelp">
+      <span class="trim" id="budgethelp" style="margin:0">out the door</span></div>
+    <button type="button" class="freset" id="freset" hidden>Clear filters</button>
+    <p class="fnote" id="fnote" hidden></p>
+    <p class="fnote" id="cvtnote" hidden></p>
+  </div>
+
+  <section class="list" id="list" aria-live="polite"></section>
+  <div class="pop" id="pop" role="dialog" aria-modal="false" hidden></div>
+  <div class="empty" id="empty">No cars here yet. The search fills this list with matches, and you can mark each one Interested or Pass.</div>
+
+  <details>
+    <summary>What the search looks for</summary>
+    <div class="crit">
+      <div><h3>Models</h3><ul>
+        <li>Toyota Corolla, Camry (4-cyl), Matrix, Prius (check hybrid battery age), Scion xA/xB/xD</li>
+        <li>Pontiac Vibe (a Toyota underneath)</li>
+        <li>Honda Civic, Fit, Accord (4-cyl)</li>
+        <li>Mazda3, Mazda6 (2009+ 4-cyl)</li>
+        <li>Hyundai Elantra (2007-2010 and 1.8L 2011-2016)</li>
+        <li>VW Passat 2012-15 2.5, Jetta 2010-14 2.5/2.0</li>
+        <li>Ford Fusion / Mercury Milan 2010-12 2.5, Acura TSX</li>
+        <li>Toyota Echo, Mazda2, Mazda5, Acura RSX</li>
+        <li>Elantra Touring, Kia Spectra 2007-09, Suzuki SX4</li>
+        <li>Ford Focus/Fiesta, Nissan Sentra/Versa (manual only)</li>
+        <li>Small SUVs: Honda CR-V 2002-11, Element, Toyota RAV4 2001-12</li>
+        <li>Subaru Impreza/Crosstrek 2012-16 and Outback/Legacy 2010-14 manual only; Forester 2011-13 (manual or 4-speed automatic)</li>
+        <li>Cute but less reliable, tagged: Fiat 500, Mini Cooper, VW Beetle</li>
+      </ul></div>
+      <div><h3>How cars are rated</h3><ul>
+        <li><b>Safety:</b> good means stability control and side curtain airbags standard plus solid crash tests; weak means older or very small cars without them</li>
+        <li><b>Deal:</b> compared with market value from CarGurus and similar listings, with dealer fees counted when known</li>
+        <li><b>Reliability:</b> how likely the car is to stay out of the shop, based on the model's track record, known problem years and miles; it's an expectation, not a guarantee</li>
+        <li><b>Yearly upkeep:</b> routine maintenance (oil, tires, brakes, battery, fluids) plus a repair allowance that rises with lower reliability, high miles, AWD and pricier-to-fix brands; a rough guide for comparing cars, not a quote</li>
+        <li><b>Watch for:</b> the most common problems for that model and year, with rough independent-shop repair costs; dealers usually charge more</li>
+        <li><b>Budget bar:</b> the estimated out-the-door range against the budget you set; green has room to spare, yellow is tight, red is over</li>
+        <li><b>AWD</b> helps in snow, but good winter tires matter more than drive type</li>
+      </ul></div>
+      <div><h3>Must have</h3><ul>
+        <li>$3,000 to $5,500 asking</li>
+        <li>Under 175,000 miles</li>
+        <li>Clean title</li>
+        <li>Automatic or manual</li>
+        <li>Anywhere in Utah, plus Evanston WY, Preston ID and West Wendover NV</li>
+      </ul></div>
+      <div><h3>Skipped on purpose</h3><ul>
+        <li>Rebuilt or salvage titles</li>
+        <li>Hyundai/Kia engines from the 2011-2019 failure settlements</li>
+        <li>Ford Focus/Fiesta automatics (manuals are fine), Chevy Cruze/Sonic</li>
+        <li>Full-size cars (Crown Vic, Impala) and big SUVs</li>
+        <li>Any CVT automatic: automatic Subarus (except the 2011-13 Forester), Insight, 2014+ Corolla, 2016+ Civic, 2013+ Accord, 2015+ Fit, 2010+ SX4, Nissan automatics. Manual versions are fine. The Prius stays: its "eCVT" is a different, very durable design.</li>
+      </ul></div>
+    </div>
+  </details>
+
+  <p class="foot">Out-the-door is an estimate: asking price plus about 7.25% sales tax and $150-250 for title, registration and emissions. At dealers it also adds the doc fee (about $450 on average in Utah) and add-on packages, which run from nothing to about $1,700, so it shows a range until we know that dealer's fees. Always get the out-the-door price in writing, run the Carfax, and get a pre-purchase inspection before buying.</p>
+</div>
+
+<script>
+(function () {
+  const FDEFAULT = { safety: "any", deal: "any", trans: "any", drive: "any" };
+  const state = { rows: [], filter: "active", sort: "score", canWrite: true, pub: false, meta: null, f: Object.assign({}, FDEFAULT) };
+  // Drive type: many models were only ever front-wheel drive, Subarus are always AWD,
+  // and a few small SUVs and wagons came both ways and need the listing to confirm.
+  const FWD_ONLY = /corolla|camry|civic|accord|\bfit\b|elantra|mazda ?[2356]|^[2356]$|prius|yaris|echo|prizm|^x[abd]$|jetta|passat|focus|fiesta|fusion|milan|sentra|versa|accent|\brio\b|insight|tsx|rsx|^es|500|cooper|hardtop|beetle|spectra/i;
+  const MIXED = /cr-?v|rav ?4|element|sx4|matrix|vibe/i;
+  function driveOf(r) {
+    const listed = /awd|4wd|all.wheel|four.wheel/i.test(r.drive || "") ? "AWD" : /fwd|front/i.test(r.drive || "") ? "FWD" : "";
+    const mk = r.make || "", mo = r.model || "";
+    if (/subaru/i.test(mk) && !/brz/i.test(mo)) return { d: "AWD", how: "All Subarus on this list are AWD" };
+    if (MIXED.test(mo)) {
+      const trusted = r.driveSource === "listed" || r.driveSource === "photo" || (!r.driveSource && r.source && r.source !== "Facebook");
+      if (listed && trusted) return { d: listed, how: r.driveSource === "photo" ? "Read from listing photos" : "Stated in the listing" };
+      return { d: "?", how: "This model came in both FWD and AWD; not confirmed yet" };
+    }
+    if (FWD_ONLY.test(mo)) return { d: "FWD", how: "This model was only sold with front-wheel drive" };
+    if (listed) return { d: listed, how: "Stated in the listing" };
+    return { d: "?", how: "Not confirmed yet" };
+  }
+  const isAwd = (r) => driveOf(r).d === "AWD";
+  const isFwd = (r) => driveOf(r).d === "FWD";
+  const isManual = (r) => /manual/i.test(r.trans || "");
+  const isAuto = (r) => /automatic|automanual|cvt/i.test(r.trans || "");
+  // CVT automatics are skipped. "yes" = automatic on a CVT-only model (hidden); "maybe" = CVT model with
+  // the transmission not confirmed (shown, but can't be a top pick until it's confirmed manual).
+  function cvtStatus(r) {
+    if (isManual(r)) return "";
+    const mk = (r.make || "").toLowerCase(), mo = (r.model || "").toLowerCase(), y = r.year || 0, tr = (r.trim || "").toLowerCase();
+    let cvt = false, always = false;
+    if (/subaru/.test(mk)) cvt = /impreza|crosstrek|xv/.test(mo) || (/outback|legacy/.test(mo) && y >= 2010) || (/forester/.test(mo) && y >= 2014);
+    if (!/prius/.test(mo) && ((/insight/.test(mo) && y >= 2010) || /hybrid/.test(tr + " " + mo))) cvt = always = true; // Prius eCVT is a planetary gearset, not a belt CVT: allowed
+    if (/corolla/.test(mo) && y >= 2014 && !(y <= 2016 && /^l\b/.test(tr))) cvt = true;
+    if (/civic/.test(mo) && y >= 2016) cvt = true;
+    if (/accord/.test(mo) && y >= 2013) cvt = true;
+    if (/\bfit\b/.test(mo) && y >= 2015) cvt = true;
+    if (/sx4/.test(mo) && y >= 2010) cvt = true;
+    if (/nissan/.test(mk)) cvt = true;
+    if (!cvt) return "";
+    return isAuto(r) || /cvt/i.test(r.trans || "") || always ? "yes" : "maybe";
+  }
+  const isHiddenCvt = (r) => cvtStatus(r) === "yes";
+  let budget = 6000;
+  const LV = ["", "Poor", "Below avg", "Average", "Good", "Excellent"];
+  const clamp = (n) => Math.max(1, Math.min(5, Math.round(n)));
+  // Safety on a 1-5 scale. The search can store safetyScore; otherwise derive from the rating and year.
+  function safetyScore(r) {
+    if (typeof r.safetyScore === "number") return clamp(r.safetyScore);
+    if (r.safety === "good") return (r.year || 0) >= 2014 ? 5 : 4;
+    if (r.safety === "ok") return 3;
+    if (r.safety === "weak") return (r.year || 0) && r.year < 2005 ? 1 : 2;
+    return 0;
+  }
+  // Expected reliability on a 1-5 scale: model reputation, known problem years, then mileage.
+  function relScore(r) {
+    if (typeof r.reliabilityScore === "number") return clamp(r.reliabilityScore);
+    const mk = (r.make || "").toLowerCase(), mo = (r.model || "").toLowerCase(), y = r.year || 0, man = isManual(r);
+    let s = 3;
+    if (/toyota|lexus|scion/.test(mk) || /prizm|vibe/.test(mo)) s = 5;
+    if (/prius/.test(mo)) s = 4;
+    if (/camry|rav4/.test(mo) && y >= 2007 && y <= 2009) s = 4;
+    if (/vibe|matrix/.test(mo) && y >= 2009) s = 4;
+    if (/xb|\btc\b/.test(mo) && y >= 2008) s = 4;
+    if ((/prizm/.test(mo) || /corolla/.test(mo)) && y && y <= 2002) s = 4;
+    if (/honda|acura/.test(mk)) s = 5;
+    if (/civic/.test(mo) && y >= 2006 && y <= 2009) s = 3;
+    if (/civic/.test(mo) && y >= 2001 && y <= 2005 && !man) s = 4;
+    if (/accord/.test(mo) && y && y <= 2002 && !man) s = 4;
+    if (/insight/.test(mo)) s = 4;
+    if (/mazda/.test(mk)) s = 4;
+    if (/hyundai|kia/.test(mk)) s = /elantra|spectra/.test(mo) ? 4 : 3;
+    if (/accent|rio/.test(mo) && y >= 2012) s = 3;
+    if (/subaru/.test(mk)) s = man ? 4 : 3;
+    if (/suzuki/.test(mk)) s = 4;
+    if (/volkswagen|vw/.test(mk)) s = 3;
+    if (/ford|mercury/.test(mk)) s = /fusion|milan/.test(mo) ? 4 : 3;
+    if (/nissan/.test(mk)) s = 3;
+    if (/fiat|mini/.test(mk) || /beetle/.test(mo)) s = 2;
+    if ((r.miles || 0) >= 180000) s -= 1;
+    return clamp(s);
+  }
+  // Known weak spots by model and year, with rough independent-shop repair costs.
+  // The search can store car-specific r.issues = [{issue, cost}]; this is the fallback.
+  function issuesFor(r) {
+    if (Array.isArray(r.issues) && r.issues.length) return r.issues.slice(0, 2);
+    const mk = (r.make || "").toLowerCase(), mo = (r.model || "").toLowerCase(), y = r.year || 0, man = isManual(r), out = [];
+    const add = (issue, cost) => out.push({ issue, cost });
+    if (/subaru/.test(mk)) {
+      if (cvtStatus(r)) add("If it turns out to be a CVT automatic, skip it (manual is what we want)", "CVT replacement $4,000-7,000");
+      if (/outback|legacy/.test(mo) && y <= 2012) add("Head gasket leaks on the 2.5L", "$1,800-2,800");
+      if (/forester/.test(mo) && y >= 2011 && y <= 2013) add("Oil consumption on the 2.5L", "Often just topping off; engine repair $3,000+");
+      if (/impreza|crosstrek/.test(mo) && man) add("Clutch wear", "$1,000-1,500");
+    } else if (/volkswagen|vw/.test(mk)) {
+      add("Window regulators and ignition coils", "$250-450 each");
+      add("Water pump and thermostat housing leaks", "$500-900");
+    } else if (/ford|mercury/.test(mk)) {
+      if (/fusion|milan/.test(mo)) { add("Throttle body failure (limp mode)", "$300-500"); add("Automatic transmission shudder", "$300 fluid service to $3,000 rebuild"); }
+      else { add("Clutch wear", "$900-1,400"); if (/focus/.test(mo) && y <= 2014) add("Electric power steering fault", "$800-1,500; check for open recalls"); }
+    } else if (/nissan/.test(mk)) {
+      add("Clutch wear", "$900-1,300");
+    } else if (/accent|rio/.test(mo) && y >= 2012) {
+      add("Direct-injection engine failure risk (settlement engine family)", "$3,500-5,000 engine; free knock-sensor update at dealer");
+    } else if (/hyundai|kia/.test(mk)) {
+      if (/elantra/.test(mo) && y >= 2011) add("Steering coupler clunk", "$150-300");
+      add("Ignition coils and sensors with age", "$150-400");
+    } else if (/mazda/.test(mk)) {
+      add("Engine and transmission mounts", "$300-600");
+      if (man) add("Clutch wear", "$900-1,300");
+    } else if (/suzuki/.test(mk)) {
+      add("Parts can be slow to find since Suzuki left the US car market in 2013", "Usually similar prices, longer waits");
+    } else if (/fiat/.test(mk)) {
+      add("Electrical gremlins and oil leaks", "$300-1,000");
+      add("Clutch or transmission problems", "$1,200-2,500");
+    } else if (/mini/.test(mk)) {
+      add("Timing chain tensioner and oil leaks", "$1,000-2,000");
+      add("Water pump and thermostat", "$600-900");
+    } else if (/beetle/.test(mo)) {
+      add("Window regulators and ignition coils", "$250-450 each");
+    } else if (/prius/.test(mo)) {
+      add("Hybrid battery replacement", "$1,500-3,500");
+    } else if (/insight/.test(mo)) {
+      add("Hybrid battery replacement", "$1,500-2,500");
+    } else if (/civic/.test(mo) && y >= 2006 && y <= 2009) {
+      add("Cracked engine block (coolant loss)", "$2,500-4,000 for a replacement engine");
+      add("A/C compressor", "$800-1,200");
+    } else if (/cr-?v|element/.test(mo)) {
+      add("A/C compressor failure", "$1,000-1,500");
+      if (/cr-?v/.test(mo) && y >= 2007) add("Rattle on cold start (VTC actuator)", "$300-500");
+    } else if (/camry/.test(mo)) {
+      if (y >= 2007 && y <= 2009) add("Oil burning on the 2.4L engine", "Often just topping off; piston ring fix $2,500-3,500");
+      if (y >= 2007 && y <= 2011) add("Sticky or melting dashboard in hot sun (cosmetic)", "Dash cover $50-150; replacement $800-1,500");
+      if (y >= 2010 && y <= 2011) add("Water pump leak on the 2.5L", "$400-700");
+    } else if (/rav4/.test(mo) && y >= 2006 && y <= 2009) {
+      add("Oil burning on the 2.4L engine", "Often just topping off; piston ring fix $2,500-3,500");
+    } else if (/xb|\btc\b/.test(mo) && y >= 2008) {
+      add("Oil burning on the 2.4L engine", "Often just topping off; piston ring fix $2,500-3,500");
+    } else if (/vibe|matrix/.test(mo) && y >= 2009) {
+      add("Oil burning on the 2.4L engine (1.8L is fine)", "Often just topping off; piston ring fix $2,500-3,500");
+    } else if (/prizm/.test(mo) || (/corolla/.test(mo) && y <= 2002)) {
+      add("Oil burning on the older 1.8L engine", "Often just topping off; piston ring fix $2,000-3,000");
+    } else if (/corolla|matrix|vibe/.test(mo) && y >= 2009) {
+      add("Water pump leak", "$400-600");
+    } else if (/civic/.test(mo) && y >= 2001 && y <= 2005) {
+      add("Automatic transmission failure on 2001-2005 Civics", "$2,000-3,000; manuals are fine");
+    } else if (/accord/.test(mo) && y <= 2002) {
+      add("Timing belt and water pump due", "$500-900");
+      if (man) add("Clutch wear", "$900-1,300"); else add("Automatic transmission wear", "$2,000-3,000");
+    } else if (/accord/.test(mo) && y >= 2008 && y <= 2012) {
+      add("Rear brakes wear quickly", "$250-400 per axle");
+    } else if (/lexus/.test(mk) && /^es/.test(mo) && y <= 2006) {
+      add("Sticky or melting dashboard (cosmetic)", "Dash cover $50-150; replacement $800-1,500");
+    } else if (/fit/.test(mo) && y <= 2008) {
+      add("Ignition coils", "$150-300");
+    }
+    if ((r.miles || 0) >= 160000) add("High-mile wear: struts, mounts, A/C, radiator", "Budget $500-1,500 a year");
+    return out.slice(0, 2);
+  }
+  // Rough yearly upkeep: routine maintenance (oil, tires, brakes, battery, wipers, fluids averaged per year)
+  // plus a repair allowance that grows as reliability drops and miles climb.
+  function upkeep(r) {
+    let lo = 500, hi = 800;
+    const rep = { 5: [200, 500], 4: [400, 800], 3: [700, 1300], 2: [1000, 2000], 1: [1500, 2800] }[relScore(r)] || [600, 1200];
+    lo += rep[0]; hi += rep[1];
+    if ((r.miles || 0) >= 160000) { lo += 200; hi += 500; }
+    if (isAwd(r)) { lo += 100; hi += 200; }
+    if (/volkswagen|vw|mini|fiat|lexus|acura|subaru/i.test(r.make || "")) { lo += 100; hi += 200; }
+    const round = (n) => Math.round(n / 100) * 100;
+    return [round(lo), round(hi)];
+  }
+  function relWhy(r) {
+    if (r.reliabilityWhy) return r.reliabilityWhy;
+    const s = relScore(r);
+    return "Estimated from this model's track record" + ((r.miles || 0) >= 180000 ? ", lowered for very high miles." : ".") + (s <= 2 ? " Expect more repairs." : "");
+  }
+  function passesFilters(r) {
+    const f = state.f;
+    if (f.safety === "ok" && !(r.safety === "ok" || r.safety === "good")) return false;
+    if (f.safety === "good" && r.safety !== "good") return false;
+    if (f.deal === "ok" && !(r.deal === "ok" || r.deal === "good")) return false;
+    if (f.deal === "good" && r.deal !== "good") return false;
+    if (f.trans === "auto" && !isAuto(r)) return false;
+    if (f.trans === "manual" && !isManual(r)) return false;
+    if (f.drive === "awd" && !isAwd(r)) return false;
+    if (f.drive === "fwd" && !isFwd(r)) return false;
+    return true;
+  }
+  let db = null;
+  const $ = (id) => document.getElementById(id);
+  const fmt$ = (n) => (n || n === 0) ? "$" + Math.round(n).toLocaleString("en-US") : "—";
+  const fmtMi = (n) => n ? Math.round(n / 1000) + "k mi" : "miles ?";
+  // Utah: ~7.25% sales tax (Salt Lake County), ~$150-250 title/registration/emissions.
+  // Dealers: doc fee averages ~$450 statewide, plus add-on packages from $0 to ~$1,700.
+  const otd = (r) => {
+    if (!r.price) return null;
+    const tax = r.price * 1.0725;
+    if (r.sellerType === "private") return [tax + 150, tax + 250];
+    if (r.feesIncluded) return [r.price * 1.0725 + 150, r.price * 1.0725 + 250];
+    if (typeof r.fees === "number") return [tax + r.fees + 150, tax + r.fees + 250];
+    return [tax + 550, tax + 1800];
+  };
+  const fmtRange = (v) => !v ? "—" : (Math.round(v[0] / 50) * 50 === Math.round(v[1] / 50) * 50 ? fmt$(v[0]) : fmt$(Math.round(v[0] / 50) * 50) + "–" + fmt$(Math.round(v[1] / 50) * 50).slice(1));
+  const otdBreakdown = (r) => {
+    const tax = Math.round(r.price * 0.0725);
+    const parts = [fmt$(r.price) + " price", "+ " + fmt$(tax) + " sales tax (7.25%)", "+ $150-250 title, registration and emissions"];
+    if (r.sellerType === "private") parts.push("+ $0 dealer fees (private sale)");
+    else if (r.feesIncluded) parts.push("+ dealer fees already in the price");
+    else if (typeof r.fees === "number") parts.push("+ " + fmt$(r.fees) + " dealer fees (known)");
+    else parts.push("+ about $400-1,550 dealer fees (doc fee plus possible add-ons; ask them)");
+    return parts.join(" ") + " = " + fmtRange(otd(r));
+  };
+  const otdBasis = (r) => r.sellerType === "private" ? "Private sale: tax and registration only" : r.feesIncluded ? "Listed price already includes dealer fees" : typeof r.fees === "number" ? "Includes known dealer fees of " + fmt$(r.fees) : "Dealer fees unknown: ask for the out-the-door price";
+  const ago = (iso) => {
+    if (!iso) return "";
+    const d = (Date.now() - new Date(iso).getTime()) / 36e5;
+    if (d < 1) return "just now"; if (d < 24) return Math.round(d) + "h ago";
+    return Math.round(d / 24) + "d ago";
+  };
+  const isNew = (r) => r.status === "new" || (!r.status && r.firstSeen && (Date.now() - new Date(r.firstSeen)) < 36e5 * 30);
+  // Fit score (0-100): how well a car matches what we want, in priority order.
+  // Safety 30, reliability 25, deal 15, budget fit 15, upkeep 5, miles 5, plus AWD bonus and small penalties.
+  const hoursAway = (r) => { const m = /(\d+(?:\.\d+)?)(?:\s*-\s*\d+(?:\.\d+)?)?\s*hours?\s+away/i.exec(r.note || ""); return m ? parseFloat(m[1]) : 0; };
+  const clamp01 = (x) => Math.max(0, Math.min(1, x));
+  function fitParts(r) {
+    const sS = safetyScore(r) || 2, rS = relScore(r) || 3;
+    const p = { safety: sS * 6, reliability: rS * 5, deal: { good: 15, ok: 9, bad: 0 }[r.deal] ?? 7, budget: 0, upkeep: 0, miles: 0, extra: 0 };
+    const o = otd(r);
+    if (o) { const k = o[1] / budget; p.budget = k <= 0.85 ? 15 : k <= 1 ? 15 - (k - 0.85) / 0.15 * 9 : Math.max(0, 6 - (k - 1) * 60); }
+    p.upkeep = 5 * clamp01((2600 - upkeep(r)[1]) / 1600);
+    p.miles = r.miles ? 5 * clamp01((180000 - r.miles) / 120000) : 1;
+    if (isAwd(r)) p.extra += 4;
+    if ((r.tags || []).some((t) => /rough/i.test(t))) p.extra -= 2;
+    if (r.tier === "flag" || cvtStatus(r) === "maybe") p.extra -= 12;
+    const h = hoursAway(r); if (h >= 3.5) p.extra -= 5; else if (h >= 2) p.extra -= 3;
+    return p;
+  }
+  function fitScore(r) { const p = fitParts(r); return Math.max(0, Math.min(100, Math.round(Object.values(p).reduce((a, b) => a + b, 0)))); }
+  // Top pick: the car clears every must-have, nothing left to check first.
+  function pickGaps(r) {
+    const g = [], sS = safetyScore(r), rS = relScore(r), o = otd(r);
+    if (!(sS >= 4 || (sS >= 3 && isAwd(r)))) g.push("safety below Good");
+    if (!(rS >= 4)) g.push("reliability below Good");
+    if (r.deal === "bad") g.push("priced high");
+    if (!o || o[1] > budget) g.push("could go over budget");
+    if (r.tier === "flag") g.push("has something to check first");
+    if (!r.miles) g.push("miles not listed");
+    if (cvtStatus(r) === "maybe") g.push("CVT automatic unless it's a manual, so confirm the transmission");
+    return g;
+  }
+  const isPick = (r) => pickGaps(r).length === 0;
+  const tierRank = { pick: 0, good: 1, flag: 2 };
+  const rank3 = { good: 0, ok: 1, bad: 2 };
+  const rank3s = { good: 0, ok: 1, weak: 2 };
+  const dealLabel = { good: "Good deal", ok: "OK deal", bad: "Bad deal" };
+  const safeLabel = { good: "Safety: good", ok: "Safety: OK", weak: "Safety: weak" };
+  const safeCls = { good: "b-good", ok: "b-ok", weak: "b-bad" };
+
+  function counts() {
+    const c = { active: 0, new: 0, interested: 0, passed: 0, gone: 0 };
+    let hid = 0;
+    for (const r of state.rows) {
+      const s = r.status || "new";
+      if (isHiddenCvt(r)) { if (s !== "gone" && s !== "passed") hid++; continue; }
+      if (s === "gone") c.gone++; else if (s === "passed") c.passed++;
+      else { c.active++; if (s === "interested") c.interested++; if (isNew(r) && s !== "interested") c.new++; }
+    }
+    for (const k in c) $("n-" + k).textContent = c[k];
+    const cn = $("cvtnote"); if (cn) { cn.hidden = !hid; cn.textContent = hid ? "Not showing " + hid + " car" + (hid === 1 ? "" : "s") + " with a CVT automatic (mostly automatic Subarus). Manual versions still show." : ""; }
+  }
+
+  function visible() {
+    let rows = state.rows.filter((r) => {
+      const s = r.status || "new";
+      if (isHiddenCvt(r)) return false;
+      if (!passesFilters(r)) return false;
+      switch (state.filter) {
+        case "active": return s !== "gone" && s !== "passed";
+        case "new": return s !== "gone" && s !== "passed" && s !== "interested" && isNew(r);
+        default: return s === state.filter;
+      }
+    });
+    const by = {
+      score: (a, b) => (isPick(b) - isPick(a)) || fitScore(b) - fitScore(a) || (a.price || 9e9) - (b.price || 9e9),
+      deal: (a, b) => (rank3[a.deal] ?? 1) - (rank3[b.deal] ?? 1) || (tierRank[a.tier] ?? 1) - (tierRank[b.tier] ?? 1),
+      safety: (a, b) => safetyScore(b) - safetyScore(a) || (tierRank[a.tier] ?? 1) - (tierRank[b.tier] ?? 1),
+      upkeep: (a, b) => upkeep(a)[1] - upkeep(b)[1] || relScore(b) - relScore(a),
+      reliability: (a, b) => relScore(b) - relScore(a) || safetyScore(b) - safetyScore(a) || (a.price || 9e9) - (b.price || 9e9),
+      newest: (a, b) => String(b.firstSeen || "").localeCompare(String(a.firstSeen || "")),
+      price: (a, b) => (a.price || 9e9) - (b.price || 9e9),
+      miles: (a, b) => (a.miles || 9e9) - (b.miles || 9e9),
+    }[state.sort];
+    return rows.sort(by);
+  }
+
+  function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+
+  const TAG_HELP = {
+    "New": "Just found. Nobody has marked it Interested or Pass yet.",
+    "On our list": "Dad marked this one as worth a closer look.",
+    "Top pick": "Passes every must-have: good safety, good reliability, a fair price, fits the budget, and nothing left to check.",
+    "Check first": "Something needs a look before getting excited, like missing miles, an unconfirmed title or an old hybrid battery. The note on the card says what.",
+    "Good deal": "Priced below what similar cars sell for.",
+    "OK deal": "Priced about right for what it is.",
+    "Bad deal": "They're asking more than it's worth. Could still work if they come down.",
+    "AWD": "All four wheels get power, so it's easier to get going in snow.",
+    "Manual": "Stick shift. You already know how to drive one.",
+    "Manual? (skip if CVT)": "This model usually comes with a CVT automatic, which we're skipping. Only worth it if it turns out to be a manual.",
+    "Fun to drive": "Peppy, steers well and feels sporty.",
+    "Practical": "Lots of cargo room for its size: a hatchback, wagon or small SUV.",
+    "Cute, less reliable": "Fun style, but more likely to need repairs.",
+    "Rough photos": "Few or blurry photos, so it's hard to judge condition. See it in person before deciding.",
+  };
+  const GLOSSARY = {
+    safety: ["Safety", "How well the car protects you in a crash. It's based on crash-test scores, plus two features that matter a lot: stability control (helps keep the car from skidding or spinning out) and side curtain airbags (protect your head if you get hit from the side).", "Newer cars usually score higher. More bars is better."],
+    reliability: ["Reliability", "How likely the car is to keep running without big, surprise repair bills. Toyota and Honda are usually the best at this.", "Very high miles knocks the score down a notch, because even good cars wear out."],
+    budget: ["Budget bar", "How much of your budget this car would use once tax and fees are added. The solid part is the low guess; the lighter part shows how high it could go.", "Green means room to spare, yellow is tight, red is over. You can change the budget number in the filters at the top."],
+    otd: ["Out the door", "The total you actually pay to drive the car home. It's the price, plus sales tax (about 7.25% in Utah), plus title, registration and emissions (about $150-250), plus any dealer fees.", "Private sellers don't charge fees. Dealer fees (doc fees, \"prep\" fees, add-ons) are often negotiable, so always ask for the out-the-door number in writing."],
+    upkeep: ["Yearly upkeep", "A rough guess at what it costs each year to keep the car running: oil changes, tires, brakes, a battery now and then, plus money set aside for repairs.", "Gas and insurance are extra. Less reliable or high-mile cars get a bigger repair allowance."],
+    watch: ["Watch for", "The most common problems for this model and year, and about what they cost to fix.", "Ask the seller if it's already been fixed, and have a mechanic look the car over before buying (about $100-150, worth every penny)."],
+    trans: ["Transmission", "Automatic: the car shifts gears for you. Manual (stick shift): you use a clutch pedal and shift yourself. You already know how!", "Manuals are often cheaper and last a long time, but the clutch wears out eventually ($800-1,500). CVT is a type of automatic with no fixed gears. They're smooth and good on gas, but many wear out early and cost $4,000-7,000 to replace, so we're skipping them. Manual versions of those cars are still fine. The Prius is the exception: its \"eCVT\" is a simple gear set with no belt, and it's one of the toughest transmissions around."],
+    drive: ["AWD vs FWD", "FWD (front-wheel drive): the front wheels push the car. Totally fine for most driving, especially with good tires. AWD (all-wheel drive): all four wheels get power, so it's easier to get moving in snow and up icy hills.", "AWD does NOT help you stop or turn on ice. Good winter tires help more than AWD does. \"AWD?\" means this model came both ways, so check the listing."],
+    deal: ["Deal rating", "Compares the asking price to what similar cars (same year, miles and condition) sell for around here.", "Good deal = priced below what it's worth. OK = about fair. Bad = they're asking too much. A bad deal can still be a good car if they'll come down on price."],
+    fit: ["Overall fit", "One number that sums up how well a car matches what we want, weighted in the order that matters most: safety (30 points), reliability (25), deal (15), fitting the budget (15), upkeep (5) and miles (5). AWD adds a few points; being far away, rough photos or something to check first take a few off.", "\"Best overall fit\" sorting puts Top picks first, then everything else by this number."],
+    tags: ["Tags", "Top pick: the car clears every must-have (Good safety, Good reliability, a fair or better price, fits the budget, nothing to check first). Change the budget and the picks update. Check first: something to look into before getting excited, like a rebuilt title or missing details. New: just found.", "AWD and Manual tell you how it drives. Other tags are quick notes, like \"fun to drive\" or \"cute but less reliable.\""],
+    facts: ["Quick facts", "Miles: how far it's been driven. Lower is usually better, but a well-cared-for car with high miles can beat a neglected one with low miles. Toyotas and Hondas often go past 200,000.", "Manual/Automatic/CVT is the transmission. AWD or FWD is which wheels get power. Dealer vs private: dealers add fees but handle paperwork and sometimes give a short warranty; private sellers are usually cheaper, no fees, but sold as-is. Orange means not listed yet."],
+  };
+  function infoBtn(g, label) {
+    const b = el("button", "info"); b.type = "button"; b.dataset.g = g; b.setAttribute("aria-label", label || "What does this mean?"); b.setAttribute("aria-expanded", "false"); return b;
+  }
+  (function setupInfo() {
+    const pop = document.getElementById("pop");
+    let cur = null;
+    const close = () => { pop.hidden = true; if (cur) { cur.setAttribute("aria-expanded", "false"); cur = null; } };
+    const open = (btn) => {
+      const g = GLOSSARY[btn.dataset.g]; if (!g) return;
+      if (cur === btn) { close(); return; }
+      close();
+      pop.textContent = "";
+      pop.appendChild(el("b", null, btn.dataset.tags ? "What these tags mean" : g[0]));
+      if (btn.dataset.tags) {
+        const dl = el("dl", "tdefs");
+        for (const t of btn.dataset.tags.split("|")) {
+          if (!TAG_HELP[t]) continue;
+          dl.appendChild(el("dt", null, t)); dl.appendChild(el("dd", null, TAG_HELP[t]));
+        }
+        pop.appendChild(dl);
+      } else for (const t of g.slice(1)) pop.appendChild(el("p", null, t));
+      pop.setAttribute("aria-label", g[0]);
+      pop.hidden = false; pop.style.left = "0px"; pop.style.top = "0px";
+      const r = btn.getBoundingClientRect(), pw = pop.offsetWidth, ph = pop.offsetHeight;
+      const vw = window.innerWidth, vh = window.innerHeight;
+      let x = Math.min(Math.max(16, r.left + r.width / 2 - pw / 2), vw - pw - 16);
+      let y = r.bottom + 8; if (y + ph > vh - 8 && r.top - ph - 8 > 8) y = r.top - ph - 8;
+      pop.style.left = Math.max(16, x) + "px"; pop.style.top = Math.max(8, y) + "px";
+      btn.setAttribute("aria-expanded", "true"); cur = btn;
+    };
+    document.addEventListener("click", (e) => {
+      const btn = e.target.closest && e.target.closest(".info");
+      if (btn) { e.preventDefault(); e.stopPropagation(); open(btn); return; }
+      if (!pop.contains(e.target)) close();
+    }, true);
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape" && cur) { const b = cur; close(); b.focus(); } });
+    window.addEventListener("scroll", close, { passive: true });
+    window.addEventListener("resize", close);
+  })();
+  function render() {
+    counts();
+    const list = $("list"); list.textContent = "";
+    const rows = visible();
+    $("empty").hidden = rows.length > 0;
+    if (!rows.length && state.rows.length) $("empty").textContent = "Nothing in this view right now.";
+    for (const r of rows) {
+      const s = r.status || "new";
+      const card = el("article", "card" + (isNew(r) && s === "new" ? " is-new" : "") + (s === "passed" ? " is-passed" : "") + (s === "gone" ? " is-gone" : ""));
+      const top = el("div", "top");
+      const h = el("h2", "car", [r.year, r.make, r.model].filter(Boolean).join(" "));
+      if (r.trim) h.appendChild(el("span", "trim", r.trim));
+      top.appendChild(h); top.appendChild(el("div", "price", fmt$(r.price)));
+      card.appendChild(top);
+
+      // Quick facts: the stuff you'd want to know at a glance
+      const dv = driveOf(r);
+      const fx = el("p", "facts");
+      const fact = (t, unk) => fx.appendChild(el("span", unk ? "unk" : null, t));
+      fact(r.miles ? r.miles.toLocaleString("en-US") + " mi" : "Miles ?", !r.miles);
+      const tKnown = /manual|auto|cvt/i.test(r.trans || "");
+      const tr = /prius/i.test(r.model || "") ? "Hybrid auto" : !tKnown ? "Trans ?" : /manual/i.test(r.trans) ? "Manual" : /cvt/i.test(r.trans) ? "CVT auto" : "Automatic";
+      fact(tr, !tKnown && !/prius/i.test(r.model || ""));
+      fact(dv.d === "?" ? "AWD?" : dv.d, dv.d === "?");
+      if (r.city) fact(r.city);
+      fact(r.sellerType === "private" ? "Private" : "Dealer");
+      fx.appendChild(infoBtn("facts", "What do these mean?"));
+      card.appendChild(fx);
+
+      const b = el("div", "badges");
+      if (isNew(r) && s === "new") b.appendChild(el("span", "badge b-new", "New"));
+      if (isPick(r)) b.appendChild(el("span", "badge b-fill b-good", "Top pick"));
+      if (state.pub && s === "interested") b.appendChild(el("span", "badge b-pick", "On our list"));
+      if (r.tier === "flag") b.appendChild(el("span", "badge b-flag", "Check first"));
+      if (r.deal && dealLabel[r.deal]) b.appendChild(el("span", "badge b-fill b-" + r.deal, dealLabel[r.deal]));
+      if (isAwd(r)) b.appendChild(el("span", "badge b-good", "AWD"));
+      if (/manual/i.test(r.trans || "")) b.appendChild(el("span", "badge b-src", "Manual"));
+      if (cvtStatus(r) === "maybe") b.appendChild(el("span", "badge b-flag", "Manual? (skip if CVT)"));
+      for (const tg of (Array.isArray(r.tags) ? r.tags : [])) b.appendChild(el("span", "badge " + (/less reliable|rough/i.test(tg) ? "b-flag" : "b-src"), tg));
+      if (b.childNodes.length) {
+        const ib = infoBtn("tags", "What do these tags mean?");
+        ib.dataset.tags = [...b.querySelectorAll(".badge")].map((x) => x.textContent).join("|");
+        b.appendChild(ib); card.appendChild(b);
+      }
+
+      const mt = el("div", "meters");
+      const mlabel = (label, g) => { const l = el("span", "mlabel", label); l.appendChild(infoBtn(g, "What is " + label.toLowerCase() + "?")); return l; };
+      const segRow = (label, g, score, title) => {
+        const row = el("div", "meter"); row.title = title || "";
+        row.appendChild(mlabel(label, g));
+        const sg = el("div", "segs lv" + score); sg.setAttribute("role", "img"); sg.setAttribute("aria-label", label + ": " + (score ? score + " of 5, " + LV[score] : "not rated"));
+        for (let i = 0; i < 5; i++) sg.appendChild(document.createElement("i"));
+        row.appendChild(sg); row.appendChild(el("span", "mval", score ? LV[score] : "Not rated"));
+        return row;
+      };
+      mt.appendChild(segRow("Safety", "safety", safetyScore(r), r.safetyWhy));
+      mt.appendChild(segRow("Reliability", "reliability", relScore(r), relWhy(r)));
+      const o = otd(r);
+      if (o) {
+        const row = el("div", "meter");
+        row.appendChild(mlabel("Budget", "budget"));
+        const hiPct = o[1] / budget * 100, loPct = o[0] / budget * 100;
+        const cls = o[1] <= budget * 0.9 ? "ok" : o[0] <= budget ? "tight" : "over";
+        const bar = el("div", "budget " + cls); bar.setAttribute("role", "img");
+        bar.setAttribute("aria-label", "Uses " + Math.round(loPct) + " to " + Math.round(hiPct) + " percent of the budget");
+        const fill = el("span", "fill"); fill.style.width = Math.min(100, loPct) + "%";
+        const band = el("span", "band"); band.style.left = Math.min(100, loPct) + "%"; band.style.width = Math.max(0, Math.min(100, hiPct) - Math.min(100, loPct)) + "%";
+        bar.appendChild(fill); bar.appendChild(band);
+        row.title = "Estimated out the door " + fmtRange(o) + " against a " + fmt$(budget) + " budget";
+        row.appendChild(bar);
+        row.appendChild(el("span", "mval", o[1] > budget * 1.005 && o[0] > budget ? "Over" : Math.round(loPct) === Math.round(hiPct) ? Math.round(hiPct) + "%" : Math.round(loPct) + "–" + Math.round(Math.min(hiPct, 999)) + "%"));
+        mt.appendChild(row);
+      }
+      card.appendChild(mt);
+
+      // The two money numbers that matter most
+      const money = el("div", "money");
+      const box = (k, g, v, sub) => {
+        const d = el("div"); const kk = el("div", "k", k); kk.appendChild(infoBtn(g, "What is " + k.toLowerCase() + "?"));
+        d.appendChild(kk); d.appendChild(el("div", "v", v)); if (sub) d.appendChild(el("div", "s", sub)); return d;
+      };
+      money.appendChild(box("Out the door", "otd", fmtRange(o) || "—", r.sellerType === "private" ? "tax + DMV, no dealer fees" : (r.feesIncluded || r.fees) ? "fees known" : "dealer fees estimated"));
+      const uk = upkeep(r);
+      money.appendChild(box("Yearly upkeep", "upkeep", fmt$(uk[0]) + "–" + fmt$(uk[1]).slice(1), "about " + fmt$(Math.round((uk[0] + uk[1]) / 24 / 5) * 5) + " a month"));
+      card.appendChild(money);
+
+      const why = (label, text, g) => {
+        const p = el("p", "why"); const bb = el("b", null, label + ": ");
+        p.appendChild(bb); p.appendChild(document.createTextNode(text));
+        if (g) p.appendChild(infoBtn(g, "What does " + label.toLowerCase() + " mean?"));
+        return p;
+      };
+      {
+        const iss = issuesFor(r);
+        if (iss.length) card.appendChild(why("Watch for", (relScore(r) >= 5 ? "Minor: " : "") + iss.map((x) => x.issue + " (" + x.cost + ")").join("; "), "watch"));
+        else card.appendChild(why("Watch for", "No common problems known for this model. Plan on routine items: tires, brakes, battery, fluids (about $300-800 a year)", "watch"));
+      }
+      if (r.note) card.appendChild(el("p", "note", r.note));
+
+      // The reasoning, tucked away until you want it
+      const more = el("details", "more");
+      more.appendChild(el("summary", null, "Why these ratings"));
+      {
+        const fp = fitParts(r), gaps = pickGaps(r), r1 = (x) => Math.round(x);
+        const extra = r1(fp.extra);
+        more.appendChild(why("Overall fit", fitScore(r) + " out of 100 (safety " + r1(fp.safety) + "/30, reliability " + r1(fp.reliability) + "/25, deal " + r1(fp.deal) + "/15, budget " + r1(fp.budget) + "/15, upkeep " + r1(fp.upkeep) + "/5, miles " + r1(fp.miles) + "/5" + (extra ? ", " + (extra > 0 ? "+" : "") + extra + " for AWD, distance, photos or open questions" : "") + ")", "fit"));
+        more.appendChild(why(gaps.length ? "Not a top pick" : "Top pick", gaps.length ? gaps.join("; ") : "clears every must-have: good safety, good reliability, fair or better price, fits the budget, nothing to check first"));
+      }
+      if (r.dealWhy) more.appendChild(why("Price", r.dealWhy));
+      if (r.price) more.appendChild(why("Out the door", otdBreakdown(r)));
+      if (r.safetyWhy) more.appendChild(why("Safety", r.safetyWhy));
+      more.appendChild(why("Reliability", relWhy(r)));
+      more.appendChild(why("Yearly upkeep", "Routine maintenance plus a repair allowance based on reliability, miles and drive type. A rough estimate, not a quote. Gas and insurance not included."));
+      const dl = el("dl", "sticker");
+      const pair = (k, v, t) => { dl.appendChild(el("dt", null, k)); const dd = el("dd", null, v); if (t) dd.title = t; dl.appendChild(dd); };
+      pair("Seller", r.seller || (r.sellerType === "private" ? "Private seller" : "—"));
+      pair("Where", r.city || "—");
+      pair("Transmission", (r.trans || "not listed") + (r.transSource === "photo" ? " (from photos)" : ""));
+      pair("Drive", dv.d === "?" ? "check listing" : dv.d, dv.how);
+      pair("Listed on", r.source || "—");
+      pair("Found", ago(r.firstSeen) || "—");
+      more.appendChild(dl);
+      if (dv.how) more.appendChild(why("How we know the drive", dv.how));
+      card.appendChild(more);
+
+      const a = el("div", "actions");
+      if (state.pub) {
+        const name = [r.year, r.make, r.model].filter(Boolean).join(" ");
+        const o2 = otd(r);
+        const body = "What do you think of this one? " + name + (r.price ? ", " + fmt$(r.price) : "") + (r.miles ? ", " + r.miles.toLocaleString("en-US") + " miles" : "") + (r.city ? ", " + r.city : "") + (o2 ? ". About " + fmtRange(o2) + " out the door" : "") + (r.url ? ". " + r.url : "");
+        const t = el("a", "btn txt", "Text Dad about this one");
+        t.href = "sms:?&body=" + encodeURIComponent(body);
+        a.appendChild(t);
+        if (r.url) { const l = el("a", "open", "Open listing ↗"); l.href = r.url; l.target = "_blank"; l.rel = "noopener"; a.appendChild(l); }
+        card.appendChild(a); list.appendChild(card); continue;
+      }
+      const bi = el("button", "btn" + (s === "interested" ? " on-int" : ""), s === "interested" ? "Interested ✓" : "Interested");
+      const bp = el("button", "btn" + (s === "passed" ? " on-pass" : ""), s === "passed" ? "Passed" : "Pass");
+      bi.type = bp.type = "button";
+      bi.disabled = bp.disabled = !db || !state.canWrite;
+      bi.addEventListener("click", () => setStatus(r, s === "interested" ? "seen" : "interested"));
+      bp.addEventListener("click", () => setStatus(r, s === "passed" ? "seen" : "passed"));
+      a.appendChild(bi); a.appendChild(bp);
+      if (r.url) { const l = el("a", "open", "Open listing ↗"); l.href = r.url; l.target = "_blank"; l.rel = "noopener"; a.appendChild(l); }
+      card.appendChild(a);
+      list.appendChild(card);
+    }
+  }
+
+  async function setStatus(r, status) {
+    if (!db) return;
+    try { await db.doc("listings/" + r.id).update({ status, statusAt: new Date().toISOString() }); }
+    catch (e) { if (e && e.code === "invalid_argument") { state.canWrite = false; render(); } }
+  }
+
+  function renderMeta() {
+    const m = state.meta;
+    if (!m || !m.lastRun) { $("runline").textContent = "No search has run yet."; return; }
+    const parts = ["Last search " + new Date(m.lastRun).toLocaleString("en-US", { weekday: "short", hour: "numeric", minute: "2-digit" })];
+    if (state.pub) { $("runline").textContent = "Updated " + new Date(m.lastRun).toLocaleString("en-US", { weekday: "short", hour: "numeric", minute: "2-digit" }); return; }
+    if (m.lastNew != null) parts.push(m.lastNew + " new");
+    if (m.sources) parts.push(m.sources);
+    $("runline").textContent = parts.join(" · ");
+  }
+
+  const statusChips = () => document.querySelectorAll(".chip[data-f]");
+  const FILTERS = ["active", "new", "interested", "passed", "gone"];
+  statusChips().forEach((c) => c.addEventListener("click", () => {
+    state.filter = c.dataset.f;
+    statusChips().forEach((x) => x.setAttribute("aria-pressed", String(x === c)));
+    try { localStorage.setItem("lch-filter", state.filter); } catch (e) {}
+    render();
+  }));
+  function syncFilters() {
+    document.querySelectorAll(".seg").forEach((seg) => {
+      const v = state.f[seg.dataset.key];
+      seg.querySelectorAll("button").forEach((b) => { b.setAttribute("aria-checked", String(b.dataset.v === v)); b.tabIndex = b.dataset.v === v ? 0 : -1; });
+    });
+    const changed = Object.keys(FDEFAULT).some((k) => state.f[k] !== FDEFAULT[k]);
+    $("freset").hidden = !changed;
+    const unknownT = (state.f.trans !== "any") ? state.rows.filter((r) => !isAuto(r) && !isManual(r)).length : 0;
+    const unknownD = (state.f.drive !== "any") ? state.rows.filter((r) => !isAwd(r) && !isFwd(r)).length : 0;
+    const bits = [];
+    if (unknownT) bits.push(unknownT + " cars with an unlisted transmission");
+    if (unknownD) bits.push(unknownD + " cars whose drive type isn't confirmed yet (marked AWD?)");
+    $("fnote").hidden = !bits.length;
+    $("fnote").textContent = bits.length ? "Hidden by this filter: " + bits.join(" and ") + ". Set it back to Both to see them." : "";
+    try { localStorage.setItem("lch-f", JSON.stringify(state.f)); } catch (e) {}
+  }
+  document.querySelectorAll(".seg").forEach((seg) => {
+    seg.addEventListener("click", (e) => {
+      const b = e.target.closest("button"); if (!b) return;
+      state.f[seg.dataset.key] = b.dataset.v; syncFilters(); render();
+    });
+    seg.addEventListener("keydown", (e) => {
+      if (!["ArrowLeft", "ArrowRight"].includes(e.key)) return;
+      const bs = [...seg.querySelectorAll("button")]; const i = bs.findIndex((b) => b.dataset.v === state.f[seg.dataset.key]);
+      const n = bs[(i + (e.key === "ArrowRight" ? 1 : bs.length - 1)) % bs.length];
+      state.f[seg.dataset.key] = n.dataset.v; syncFilters(); render(); n.focus(); e.preventDefault();
+    });
+  });
+  try { const b = +localStorage.getItem("lch-budget"); if (b >= 1000) { budget = b; $("budget").value = b; } } catch (e) {}
+  $("budget").addEventListener("input", (e) => {
+    const v = +e.target.value; if (!(v >= 1000)) return;
+    budget = v; try { localStorage.setItem("lch-budget", String(v)); } catch (x) {} render();
+  });
+  $("freset").addEventListener("click", () => { state.f = Object.assign({}, FDEFAULT); syncFilters(); render(); });
+  try {
+    const saved = JSON.parse(localStorage.getItem("lch-f") || "null");
+    if (saved && typeof saved === "object") for (const k of Object.keys(FDEFAULT)) if (typeof saved[k] === "string" && document.querySelector('.seg[data-key="' + k + '"] [data-v="' + saved[k] + '"]')) state.f[k] = saved[k];
+  } catch (e) {}
+  syncFilters();
+  $("sort").addEventListener("change", (e) => { state.sort = e.target.value; try { localStorage.setItem("lch-sort", state.sort); } catch (x) {} render(); });
+  try {
+    const f = localStorage.getItem("lch-filter"), s = localStorage.getItem("lch-sort");
+    if (f && FILTERS.includes(f)) { state.filter = f; statusChips().forEach((x) => x.setAttribute("aria-pressed", String(x.dataset.f === f))); }
+    if (s) { state.sort = s; $("sort").value = s; }
+  } catch (e) {}
+  render();
+
+  (async () => {
+    if (!window.claude || !window.claude.use) return loadPublic();
+    db = await window.claude.use("db");
+    if (!db) { $("runline").textContent = "Sign in to see the saved list."; return; }
+    try {
+      const user = await window.claude.use("user");
+      const cw = user && user.can ? await user.can("data.write") : null;
+      if (cw === false) state.canWrite = false;
+    } catch (e) {}
+    db.collection("listings").onSnapshot((snap) => {
+      state.rows = snap.docs.map((d) => Object.assign({ id: d.id }, d.data()));
+      syncFilters();
+      render();
+    }, () => {});
+    db.doc("meta/status").onSnapshot((d) => { state.meta = d.exists ? d.data() : null; renderMeta(); }, () => {});
+  })();
+
+  // Read-only copy (hosted outside Claude): cars come from cars.json, refreshed after each search.
+  async function loadPublic() {
+    state.pub = true; state.canWrite = false;
+    document.documentElement.classList.add("pub");
+    document.title = "Car Hunt";
+    const h1 = document.querySelector(".sign h1"); if (h1) h1.textContent = "Car Hunt";
+    if (state.filter !== "active" && state.filter !== "new") { state.filter = "active"; statusChips().forEach((x) => x.setAttribute("aria-pressed", String(x.dataset.f === "active"))); }
+    try {
+      const res = await fetch("cars.json?t=" + Date.now(), { cache: "no-store" });
+      const data = await res.json();
+      state.rows = (data.listings || []).filter((r) => !["passed", "gone"].includes(r.status || "new"));
+      state.meta = data.meta || null;
+      syncFilters(); render(); renderMeta();
+    } catch (e) { $("runline").textContent = "Couldn't load the car list. Try again in a minute."; }
+  }
+})();
+</script>
+
+</body>
+</html>
